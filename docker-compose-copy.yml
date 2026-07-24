@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: spektar-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: db_name
+    ports:
+      - "1111:1111"
+    volumes:
+      - spektar_pgdata:/var/...
+
+volumes: 
+  spektar_pgdata:
