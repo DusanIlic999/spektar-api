@@ -129,4 +129,12 @@ export class CommunitiesService {
 
     return this.membersRepository.save(membership);
   }
+
+  async findById(id: string): Promise<CommunityEntity> {
+    const community = await this.communitiesRepository.findOneBy({ id });
+    if (!community) {
+      throw new NotFoundException(`Community with id "${id}" not found`);
+    }
+    return community;
+  }
 }

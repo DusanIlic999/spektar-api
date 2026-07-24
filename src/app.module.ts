@@ -6,6 +6,9 @@ import { AppService } from './app.service';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { CommunitiesModule } from './communities/communities.module';
+import { PostsModule } from './posts/posts.module';
+import { CommentsModule } from './comments/comments.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -23,6 +26,9 @@ import { CommunitiesModule } from './communities/communities.module';
     UsersModule,
     AuthModule,
     CommunitiesModule,
+    PostsModule,
+    CommentsModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
