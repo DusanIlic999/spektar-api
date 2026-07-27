@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
@@ -47,5 +48,12 @@ export class PostsController {
   @Post(':id/save')
   async toggleSave(@Param('id') postId: string, @Req() req: any) {
     return this.postsService.toggleSave(postId, req.user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete(':id')
+  async deletePost(@Param('id') postId: string, @Req() req: any) {
+    await this.postsService.deletePost(postId, req.user.userId);
+    return { success: true };
   }
 }

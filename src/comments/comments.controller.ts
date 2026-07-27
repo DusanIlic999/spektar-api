@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
@@ -28,5 +29,12 @@ export class CommentsController {
   @Get()
   async findByPost(@Param('postId') postId: string) {
     return await this.commentsService.findByPost(postId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete(':commentId')
+  async deleteComment(@Param('commentId') commentId: string, @Req() req: any) {
+    await this.commentsService.deleteComment(commentId, req.user.userId);
+    return { success: true };
   }
 }

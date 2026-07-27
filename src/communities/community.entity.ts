@@ -14,6 +14,15 @@ export enum CommunityType {
   PRIVATE = 'private',
 }
 
+export enum CommunityCategory {
+  NEIGHBORHOOD = 'neightborhood',
+  HOBBY = 'hobby',
+  SPORT = 'sport',
+  FOOD = 'food',
+  EVENTS = 'events',
+  REST = 'rest',
+}
+
 @Entity('communities')
 export class CommunityEntity {
   @PrimaryGeneratedColumn('uuid')
@@ -30,6 +39,13 @@ export class CommunityEntity {
 
   @Column({ type: 'enum', enum: CommunityType, default: CommunityType.PUBLIC })
   type!: CommunityType;
+
+  @Column({
+    type: 'enum',
+    enum: CommunityCategory,
+    default: CommunityCategory.NEIGHBORHOOD,
+  })
+  category!: string;
 
   @Column({ nullable: true })
   coverImageUrl?: string;

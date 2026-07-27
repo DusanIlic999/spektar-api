@@ -11,6 +11,7 @@ import { Repository } from 'typeorm';
 import { UserEntity } from 'src/users/users.entity';
 import { NotificationsService } from 'src/notifications/notifications.service';
 import { NotificationType } from 'src/notifications/notification.entity';
+import { CommunitiesService } from 'src/communities/communities.service';
 
 @Injectable()
 export class CommentsService {
@@ -20,6 +21,7 @@ export class CommentsService {
     @InjectRepository(CommentEntity)
     private readonly commentsRepository: Repository<CommentEntity>,
     private readonly notificationsService: NotificationsService,
+    private readonly communitiesService: CommunitiesService,
   ) {}
 
   async create(
@@ -99,5 +101,24 @@ export class CommentsService {
       },
       order: { createdAt: 'ASC' },
     });
+  }
+  async deleteComment(commentId: string, userId: string): Promise<void> {
+    const comment = await this.commentsRepository.findOne({
+      where: { id: commentId },
+      relations: { author: true, post: { community: true } },
+    });
+
+    if (!comment) {
+      throw new NotFoundException('Comment not found');
+    }
+
+    if (userId !== comment.author.id) {
+      await this.communitiesService.requireModeratorOrOwner(
+        comment.post.community.id,
+        userId,
+      );
+    }
+
+    await this.commentsRepository.delete({ id: commentId });
   }
 }

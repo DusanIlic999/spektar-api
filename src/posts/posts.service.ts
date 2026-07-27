@@ -157,4 +157,24 @@ export class PostsService {
       return { saved: true };
     }
   }
+
+  async deletePost(postId: string, userId: string): Promise<void> {
+    const post = await this.postsRepository.findOne({
+      where: { id: postId },
+      relations: { author: true, community: true },
+    });
+
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+
+    if (userId !== post.author.id) {
+      await this.communitiesService.requireModeratorOrOwner(
+        post.community.id,
+        userId,
+      );
+    }
+
+    await this.postsRepository.delete({ id: postId });
+  }
 }

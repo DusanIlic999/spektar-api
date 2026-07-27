@@ -1,11 +1,5 @@
-import {
-  IsEnum,
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-  MaxLength,
-} from 'class-validator';
-import { CommunityType } from '../community.entity';
+import { IsEnum, IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { CommunityCategory, CommunityType } from '../community.entity';
 
 export class CreateCommunityDto {
   @IsString()
@@ -13,12 +7,15 @@ export class CreateCommunityDto {
   @MaxLength(100)
   name!: string;
 
-  @IsOptional()
   @IsString()
   @MaxLength(500)
-  description?: string;
+  description!: string;
 
-  @IsOptional()
+  @IsNotEmpty()
   @IsEnum(CommunityType)
-  type?: CommunityType;
+  type!: CommunityType;
+
+  @IsNotEmpty()
+  @IsEnum(CommunityCategory)
+  category!: string;
 }

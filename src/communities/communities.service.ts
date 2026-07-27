@@ -81,6 +81,10 @@ export class CommunitiesService {
     return savedCommunity;
   }
 
+  async findAll(): Promise<CommunityEntity[]> {
+    return await this.communitiesRepository.find();
+  }
+
   async findBySlug(slug: string): Promise<CommunityEntity> {
     const community = await this.communitiesRepository.findOneBy({ slug });
     if (!community) {
@@ -136,5 +140,81 @@ export class CommunitiesService {
       throw new NotFoundException(`Community with id "${id}" not found`);
     }
     return community;
+  }
+
+  async requireModeratorOrOwner(
+    communityId: string,
+    userId: string,
+  ): Promise<CommunityMemberEntity> {
+    const membership = await this.findMembership(communityId, userId);
+
+    if (!membership) {
+      throw new ForbiddenException('You are not a member of this community');
+    }
+
+    if (membership.role === MemberRole.MEMBER) {
+      throw new ForbiddenException(
+        'You must be a moderator or owner to do this',
+      );
+    }
+
+    return membership;
+  }
+  async changeRole(
+    communityId: string,
+    targetUserId: string,
+    newRole: MemberRole,
+    requesterId: string,
+  ): Promise<CommunityMemberEntity> {
+    const requesterMembership = await this.findMembership(
+      communityId,
+      requesterId,
+    );
+
+    if (!requesterMembership || requesterMembership.role !== MemberRole.OWNER) {
+      throw new ForbiddenException('Only the owner can change member roles');
+    }
+
+    const targetMembership = await this.findMembership(
+      communityId,
+      targetUserId,
+    );
+
+    if (!targetMembership) {
+      throw new NotFoundException('This user is not a member of the community');
+    }
+
+    targetMembership.role = newRole;
+    return this.membersRepository.save(targetMembership);
+  }
+  async removeMember(
+    communityId: string,
+    targetUserId: string,
+    requesterId: string,
+  ): Promise<void> {
+    const requesterMembership = await this.requireModeratorOrOwner(
+      communityId,
+      requesterId,
+    );
+
+    const targetMembership = await this.findMembership(
+      communityId,
+      targetUserId,
+    );
+
+    if (!targetMembership) {
+      throw new NotFoundException('This user is not a member of the community');
+    }
+
+    if (
+      targetMembership.role !== MemberRole.MEMBER &&
+      requesterMembership.role !== MemberRole.OWNER
+    ) {
+      throw new ForbiddenException(
+        'Only the owner can remove a moderator or another owner',
+      );
+    }
+
+    await this.membersRepository.delete({ id: targetMembership.id });
   }
 }
