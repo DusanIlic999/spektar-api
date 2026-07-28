@@ -9,7 +9,9 @@ import { Repository } from 'typeorm';
 import { CommunityEntity, CommunityType } from './community.entity';
 import { CommunityMemberEntity, MemberRole } from './community-member.entity';
 import { CreateCommunityDto } from './dto/create-community.dto';
+import { UpdateCommunityDto } from './dto/update-community.dto';
 import { UserEntity } from '../users/users.entity';
+import { ImageKitService } from '../imagekit/imagekit.service';
 
 @Injectable()
 export class CommunitiesService {
@@ -18,6 +20,7 @@ export class CommunitiesService {
     private readonly communitiesRepository: Repository<CommunityEntity>,
     @InjectRepository(CommunityMemberEntity)
     private readonly membersRepository: Repository<CommunityMemberEntity>,
+    private readonly imageKitService: ImageKitService,
   ) {}
 
   private generateSlug(name: string): string {
@@ -93,6 +96,15 @@ export class CommunitiesService {
     return community;
   }
 
+  async findMembers(slug: string): Promise<CommunityMemberEntity[]> {
+    await this.findBySlug(slug);
+
+    return this.membersRepository.find({
+      where: { community: { slug: slug } },
+      relations: { user: true },
+    });
+  }
+
   async findMembership(
     communityId: string,
     userId: string,
@@ -140,6 +152,44 @@ export class CommunitiesService {
       throw new NotFoundException(`Community with id "${id}" not found`);
     }
     return community;
+  }
+
+  async update(
+    communityId: string,
+    dto: UpdateCommunityDto,
+    userId: string,
+  ): Promise<CommunityEntity> {
+    const community = await this.findById(communityId);
+    await this.requireModeratorOrOwner(communityId, userId);
+
+    Object.assign(community, dto);
+
+    try {
+      return await this.communitiesRepository.save(community);
+    } catch (error: any) {
+      if (error.code === '23505') {
+        throw new ConflictException(
+          'A community with this name already exists',
+        );
+      }
+      throw error;
+    }
+  }
+
+  async updateImage(
+    communityId: string,
+    file: Express.Multer.File,
+    userId: string,
+  ): Promise<CommunityEntity> {
+    const community = await this.findById(communityId);
+    await this.requireModeratorOrOwner(communityId, userId);
+
+    community.coverImageUrl = await this.imageKitService.uploadImage(
+      file,
+      '/communities',
+    );
+
+    return this.communitiesRepository.save(community);
   }
 
   async requireModeratorOrOwner(

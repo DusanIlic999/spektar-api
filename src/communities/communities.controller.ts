@@ -2,15 +2,22 @@ import {
   Body,
   Controller,
   Delete,
+  FileTypeValidator,
   Get,
+  MaxFileSizeValidator,
   Param,
+  ParseFilePipe,
   Patch,
   Post,
   Req,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { CommunitiesService } from './communities.service';
 import { CreateCommunityDto } from './dto/create-community.dto';
+import { UpdateCommunityDto } from './dto/update-community.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { MemberRole } from './community-member.entity';
 
@@ -34,10 +41,44 @@ export class CommunitiesController {
     return this.communitiesService.findBySlug(slug);
   }
 
+  @Get(':slug/members')
+  async findMembers(@Param('slug') slug: string) {
+    return this.communitiesService.findMembers(slug);
+  }
+
   @UseGuards(JwtAuthGuard)
   @Post(':id/join')
   async join(@Param('id') communityId: string, @Req() req: any) {
     return this.communitiesService.join(communityId, req.user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id')
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateCommunityDto,
+    @Req() req: any,
+  ) {
+    return this.communitiesService.update(id, dto, req.user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id/image')
+  @UseInterceptors(FileInterceptor('image'))
+  async updateImage(
+    @Param('id') id: string,
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }),
+          new FileTypeValidator({ fileType: /^image\/(jpeg|png|webp|gif)$/ }),
+        ],
+      }),
+    )
+    image: Express.Multer.File,
+    @Req() req: any,
+  ) {
+    return this.communitiesService.updateImage(id, image, req.user.userId);
   }
 
   @UseGuards(JwtAuthGuard)

@@ -8,10 +8,12 @@ import { Repository } from 'typeorm';
 import { CreatePostDto } from './dto/create-post.dto';
 import { PostEntity } from './post.entity';
 import { CommunitiesService } from '../communities/communities.service';
+import { CommunityType } from '../communities/community.entity';
 import { UserEntity } from '../users/users.entity';
 import { UsersService } from 'src/users/users.service';
 import { PostVoteEntity } from './post-vote.entity';
 import { SavedPostEntity } from './saved-post.entity';
+import { ImageKitService } from '../imagekit/imagekit.service';
 
 @Injectable()
 export class PostsService {
@@ -24,6 +26,7 @@ export class PostsService {
     private readonly savedPostsRepository: Repository<SavedPostEntity>,
     private readonly communitiesService: CommunitiesService,
     private readonly usersService: UsersService,
+    private readonly imageKitService: ImageKitService,
   ) {}
 
   async findById(postId: string): Promise<PostEntity> {
@@ -45,7 +48,11 @@ export class PostsService {
 
     return post;
   }
-  async create(dto: CreatePostDto, userId: string): Promise<PostEntity> {
+  async create(
+    dto: CreatePostDto,
+    userId: string,
+    image?: Express.Multer.File,
+  ): Promise<PostEntity> {
     const community = await this.communitiesService.findById(dto.communityId);
 
     const author = await this.usersService.findById(userId);
@@ -63,11 +70,15 @@ export class PostsService {
       );
     }
 
+    const imageUrl = image
+      ? await this.imageKitService.uploadImage(image, '/posts')
+      : undefined;
+
     const post = this.postsRepository.create({
       title: dto.title,
       content: dto.content,
       type: dto.type,
-      imageUrl: dto.imageUrl,
+      imageUrl,
       author: { id, avatarUrl, displayName } as UserEntity,
       community,
     });
@@ -116,9 +127,30 @@ export class PostsService {
     await this.postsRepository.increment({ id: postId }, newField, 1);
   }
 
-  async findByCommunity(communityId: string): Promise<PostEntity[]> {
+  async findByCommunity(slug: string, userId?: string): Promise<PostEntity[]> {
+    const community = await this.communitiesService.findBySlug(slug);
+
+    if (community.type !== CommunityType.PUBLIC) {
+      if (!userId) {
+        throw new ForbiddenException(
+          'You must be logged in to view this community',
+        );
+      }
+
+      const membership = await this.communitiesService.findMembership(
+        community.id,
+        userId,
+      );
+
+      if (!membership) {
+        throw new ForbiddenException(
+          'You must be a member of this community to view its posts',
+        );
+      }
+    }
+
     return await this.postsRepository.find({
-      where: { community: { id: communityId } },
+      where: { community: { slug: slug } },
       relations: { author: true, community: true },
       select: {
         author: {

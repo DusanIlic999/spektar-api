@@ -8,6 +8,7 @@ import { CommentEntity } from '../comments/comments.entity';
 import { SavedPostEntity } from './saved-post.entity';
 import { CommunitiesModule } from '../communities/communities.module';
 import { UsersModule } from 'src/users/users.module';
+import { ImageKitModule } from '../imagekit/imagekit.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { UsersModule } from 'src/users/users.module';
     ]),
     CommunitiesModule,
     UsersModule,
+    ImageKitModule,
   ],
   providers: [PostsService],
   controllers: [PostsController],

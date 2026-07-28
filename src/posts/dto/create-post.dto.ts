@@ -1,10 +1,4 @@
-import {
-  IsEnum,
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-  MaxLength,
-} from 'class-validator';
+import { IsEnum, IsNotEmpty, IsString, MaxLength } from 'class-validator';
 import { EPostType } from '../post.entity';
 
 export class CreatePostDto {
@@ -20,10 +14,6 @@ export class CreatePostDto {
   @IsEnum(EPostType)
   @IsNotEmpty()
   type!: EPostType;
-
-  @IsString()
-  @IsOptional()
-  imageUrl?: string;
 
   @IsString()
   @IsNotEmpty()

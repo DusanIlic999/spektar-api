@@ -2,13 +2,20 @@ import {
   Body,
   Controller,
   Delete,
+  FileTypeValidator,
   Get,
+  MaxFileSizeValidator,
   Param,
+  ParseFilePipe,
   Post,
   Req,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from 'src/auth/optional-jwt-auth.guard';
 import { CreatePostDto } from './dto/create-post.dto';
 import { PostsService } from './posts.service';
 import { VoteDto } from './dto/vote.dto';
@@ -19,8 +26,22 @@ export class PostsController {
 
   @UseGuards(JwtAuthGuard)
   @Post()
-  async create(@Body() dto: CreatePostDto, @Req() req: any) {
-    return this.postsService.create(dto, req.user.userId);
+  @UseInterceptors(FileInterceptor('image'))
+  async create(
+    @Body() dto: CreatePostDto,
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }),
+          new FileTypeValidator({ fileType: /^image\/(jpeg|png|webp|gif)$/ }),
+        ],
+        fileIsRequired: false,
+      }),
+    )
+    image: Express.Multer.File | undefined,
+    @Req() req: any,
+  ) {
+    return this.postsService.create(dto, req.user.userId, image);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -39,9 +60,10 @@ export class PostsController {
     return this.postsService.findById(postId);
   }
 
-  @Get('communities/:communityId/posts')
-  async findByCommunity(@Param('communityId') communityId: string) {
-    return this.postsService.findByCommunity(communityId);
+  @UseGuards(OptionalJwtAuthGuard)
+  @Get('communities/:slug/posts')
+  async findByCommunity(@Param('slug') slug: string, @Req() req: any) {
+    return this.postsService.findByCommunity(slug, req.user?.userId);
   }
 
   @UseGuards(JwtAuthGuard)
