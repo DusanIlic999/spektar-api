@@ -163,6 +163,36 @@ export class PostsService {
     });
   }
 
+  async findByAuthor(userId: string): Promise<PostEntity[]> {
+    return await this.postsRepository.find({
+      where: { author: { id: userId } },
+      relations: { author: true, community: true },
+      select: {
+        author: {
+          id: true,
+          displayName: true,
+          avatarUrl: true,
+        },
+      },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async findFromPublic(): Promise<PostEntity[]> {
+    return await this.postsRepository.find({
+      where: { community: { type: CommunityType.PUBLIC } },
+      relations: { author: true, community: true },
+      select: {
+        author: {
+          id: true,
+          displayName: true,
+          avatarUrl: true,
+        },
+      },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
   async toggleSave(
     postId: string,
     userId: string,

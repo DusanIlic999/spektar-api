@@ -8,6 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CommunityEntity, CommunityType } from './community.entity';
 import { CommunityMemberEntity, MemberRole } from './community-member.entity';
+import { PostEntity } from '../posts/post.entity';
 import { CreateCommunityDto } from './dto/create-community.dto';
 import { UpdateCommunityDto } from './dto/update-community.dto';
 import { UserEntity } from '../users/users.entity';
@@ -85,15 +86,75 @@ export class CommunitiesService {
   }
 
   async findAll(): Promise<CommunityEntity[]> {
-    return await this.communitiesRepository.find();
+    const { entities, raw } = await this.communitiesRepository
+      .createQueryBuilder('community')
+      .addSelect(
+        (qb) =>
+          qb
+            .subQuery()
+            .select('COUNT(*)', 'count')
+            .from(CommunityMemberEntity, 'member')
+            .where('member.communityId = community.id'),
+        'community_memberCount',
+      )
+      .addSelect(
+        (qb) =>
+          qb
+            .subQuery()
+            .select('COUNT(*)', 'count')
+            .from(PostEntity, 'post')
+            .where('post.communityId = community.id'),
+        'community_postCount',
+      )
+      .getRawAndEntities();
+
+    return entities.map((entity, index) => ({
+      ...entity,
+      memberCount: parseInt(raw[index].community_memberCount, 10),
+      postCount: parseInt(raw[index].community_postCount, 10),
+    }));
   }
 
   async findBySlug(slug: string): Promise<CommunityEntity> {
-    const community = await this.communitiesRepository.findOneBy({ slug });
+    const { entities, raw } = await this.communitiesRepository
+      .createQueryBuilder('community')
+      .where('community.slug = :slug', { slug })
+      .addSelect(
+        (qb) =>
+          qb
+            .subQuery()
+            .select('COUNT(*)', 'count')
+            .from(CommunityMemberEntity, 'member')
+            .where('member.communityId = community.id'),
+        'community_memberCount',
+      )
+      .addSelect(
+        (qb) =>
+          qb
+            .subQuery()
+            .select('COUNT(*)', 'count')
+            .from(PostEntity, 'post')
+            .where('post.communityId = community.id'),
+        'community_postCount',
+      )
+      .getRawAndEntities();
+
+    const community = entities[0];
     if (!community) {
       throw new NotFoundException(`Community with slug "${slug}" not found`);
     }
+    community.memberCount = parseInt(raw[0].community_memberCount, 10);
+    community.postCount = parseInt(raw[0].community_postCount, 10);
     return community;
+  }
+
+  async findByMember(userId: string): Promise<CommunityEntity[]> {
+    const memberships = await this.membersRepository.find({
+      where: { user: { id: userId } },
+      relations: { community: true },
+    });
+
+    return memberships.map((membership) => membership.community);
   }
 
   async findMembers(slug: string): Promise<CommunityMemberEntity[]> {
@@ -144,6 +205,23 @@ export class CommunitiesService {
     });
 
     return this.membersRepository.save(membership);
+  }
+  async disband(communityId: string, userId: string): Promise<void> {
+    const communityExists = await this.communitiesRepository.findOneBy({
+      id: communityId,
+    });
+
+    if (!communityExists) {
+      throw new NotFoundException('Community not found');
+    }
+
+    const member = await this.findMembership(communityId, userId);
+
+    if (member === null) {
+      throw new NotFoundException('User is not a member of this community');
+    }
+
+    await this.membersRepository.delete({ id: member.id });
   }
 
   async findById(id: string): Promise<CommunityEntity> {

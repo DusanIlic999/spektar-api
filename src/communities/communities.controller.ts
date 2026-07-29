@@ -36,6 +36,12 @@ export class CommunitiesController {
     return this.communitiesService.findAll();
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Get('me')
+  async findMine(@Req() req: any) {
+    return this.communitiesService.findByMember(req.user.userId);
+  }
+
   @Get(':slug')
   async findBySlug(@Param('slug') slug: string) {
     return this.communitiesService.findBySlug(slug);
@@ -50,6 +56,12 @@ export class CommunitiesController {
   @Post(':id/join')
   async join(@Param('id') communityId: string, @Req() req: any) {
     return this.communitiesService.join(communityId, req.user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/disband')
+  async disband(@Param('id') communityId: string, @Req() req: any) {
+    return this.communitiesService.disband(communityId, req.user.userId);
   }
 
   @UseGuards(JwtAuthGuard)

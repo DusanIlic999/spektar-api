@@ -53,6 +53,10 @@ export class CommunityEntity {
   @OneToMany(() => CommunityMemberEntity, (member) => member.community)
   members!: CommunityMemberEntity[];
 
+  memberCount?: number;
+
+  postCount?: number;
+
   @CreateDateColumn()
   createdAt!: Date;
 

@@ -37,6 +37,10 @@ export class UsersService {
     }
   }
 
+  async findAll(): Promise<UserEntity[]> {
+    return await this.usersRepository.find();
+  }
+
   async findByEmail(email: string): Promise<UserEntity> {
     const user = await this.usersRepository.findOneBy({ email });
     if (user === null) {

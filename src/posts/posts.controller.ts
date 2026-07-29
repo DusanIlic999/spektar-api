@@ -78,4 +78,10 @@ export class PostsController {
     await this.postsService.deletePost(postId, req.user.userId);
     return { success: true };
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('public/all')
+  async findAllPublicPosts() {
+    return await this.postsService.findFromPublic();
+  }
 }
