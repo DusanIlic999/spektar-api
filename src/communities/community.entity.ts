@@ -50,10 +50,15 @@ export class CommunityEntity {
   @Column({ nullable: true })
   coverImageUrl?: string;
 
+  @Column({ nullable: true })
+  coverImageFileId?: string;
+
   @OneToMany(() => CommunityMemberEntity, (member) => member.community)
   members!: CommunityMemberEntity[];
 
   memberCount?: number;
+
+  currentMember?: boolean;
 
   postCount?: number;
 

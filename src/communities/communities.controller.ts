@@ -19,6 +19,7 @@ import { CommunitiesService } from './communities.service';
 import { CreateCommunityDto } from './dto/create-community.dto';
 import { UpdateCommunityDto } from './dto/update-community.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { MemberRole } from './community-member.entity';
 
 @Controller('communities')
@@ -36,15 +37,21 @@ export class CommunitiesController {
     return this.communitiesService.findAll();
   }
 
+  @Get('/public')
+  async findPublic() {
+    return this.communitiesService.findPublic();
+  }
+
   @UseGuards(JwtAuthGuard)
   @Get('me')
   async findMine(@Req() req: any) {
     return this.communitiesService.findByMember(req.user.userId);
   }
 
+  @UseGuards(OptionalJwtAuthGuard)
   @Get(':slug')
-  async findBySlug(@Param('slug') slug: string) {
-    return this.communitiesService.findBySlug(slug);
+  async findBySlug(@Param('slug') slug: string, @Req() req: any) {
+    return this.communitiesService.findBySlug(slug, req.user?.userId);
   }
 
   @Get(':slug/members')

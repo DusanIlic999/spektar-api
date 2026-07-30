@@ -38,6 +38,7 @@ export class PostsService {
           id: true,
           displayName: true,
           avatarUrl: true,
+          username: true,
         },
       },
     });
@@ -70,7 +71,7 @@ export class PostsService {
       );
     }
 
-    const imageUrl = image
+    const uploadedImage = image
       ? await this.imageKitService.uploadImage(image, '/posts')
       : undefined;
 
@@ -78,7 +79,8 @@ export class PostsService {
       title: dto.title,
       content: dto.content,
       type: dto.type,
-      imageUrl,
+      imageUrl: uploadedImage?.url,
+      imageFileId: uploadedImage?.fileId,
       author: { id, avatarUrl, displayName } as UserEntity,
       community,
     });
@@ -157,6 +159,7 @@ export class PostsService {
           id: true,
           displayName: true,
           avatarUrl: true,
+          username: true,
         },
       },
       order: { createdAt: 'DESC' },
@@ -172,6 +175,7 @@ export class PostsService {
           id: true,
           displayName: true,
           avatarUrl: true,
+          username: true,
         },
       },
       order: { createdAt: 'DESC' },
@@ -187,6 +191,7 @@ export class PostsService {
           id: true,
           displayName: true,
           avatarUrl: true,
+          username: true,
         },
       },
       order: { createdAt: 'DESC' },
@@ -238,5 +243,6 @@ export class PostsService {
     }
 
     await this.postsRepository.delete({ id: postId });
+    await this.imageKitService.deleteImage(post.imageFileId);
   }
 }

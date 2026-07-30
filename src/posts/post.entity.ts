@@ -38,6 +38,9 @@ export class PostEntity {
   @Column({ type: 'varchar', nullable: true })
   imageUrl?: string;
 
+  @Column({ type: 'varchar', nullable: true })
+  imageFileId?: string;
+
   @ManyToOne(() => UserEntity)
   author!: UserEntity;
 

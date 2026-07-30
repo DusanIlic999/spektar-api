@@ -79,7 +79,6 @@ export class PostsController {
     return { success: true };
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get('public/all')
   async findAllPublicPosts() {
     return await this.postsService.findFromPublic();

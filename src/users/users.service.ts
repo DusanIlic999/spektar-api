@@ -8,12 +8,15 @@ import { UserEntity } from './users.entity';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
+import { ImageKitService } from 'src/imagekit/imagekit.service';
+import { EditUserDto } from './dto/edit-user.dto';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(UserEntity)
     private usersRepository: Repository<UserEntity>,
+    private readonly imageKitService: ImageKitService,
   ) {}
 
   async createUser(userData: CreateUserDto): Promise<UserEntity> {
@@ -49,6 +52,14 @@ export class UsersService {
     return user;
   }
 
+  async findByUsername(username: string): Promise<UserEntity> {
+    const user = await this.usersRepository.findOneBy({ username });
+    if (user === null) {
+      throw new NotFoundException(`Invalid Credidentials`);
+    }
+    return user;
+  }
+
   async findByEmailOrNull(email: string): Promise<UserEntity | null> {
     return await this.usersRepository.findOneBy({ email });
   }
@@ -59,5 +70,47 @@ export class UsersService {
       throw new NotFoundException(`Did not find the user with id ${id}`);
     }
     return user;
+  }
+
+  async delete(id: string): Promise<void> {
+    const user = await this.usersRepository.findOneBy({ id });
+
+    await this.usersRepository.delete({ id });
+
+    if (user) {
+      await this.imageKitService.deleteImage(user.avatarFileId);
+    }
+  }
+
+  async edit(
+    id: string,
+    userData: EditUserDto,
+    image?: Express.Multer.File,
+  ): Promise<UserEntity> {
+    const user = await this.usersRepository.findOneBy({ id: id });
+
+    if (!user) {
+      throw new NotFoundException('User with this id is not found');
+    }
+
+    const uploadedImage = image
+      ? await this.imageKitService.uploadImage(image, '/users')
+      : undefined;
+
+    const result = await this.usersRepository.update(id, {
+      username: userData.displayName,
+      bio: userData.bio,
+      email: userData.email,
+      displayName: userData.displayName,
+      avatarUrl: uploadedImage?.url,
+      avatarFileId: uploadedImage?.fileId,
+    });
+    if (result.affected === 0) throw new NotFoundException();
+
+    if (uploadedImage) {
+      await this.imageKitService.deleteImage(user.avatarFileId);
+    }
+
+    return await this.findById(id);
   }
 }

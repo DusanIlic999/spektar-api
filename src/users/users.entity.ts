@@ -20,11 +20,17 @@ export class UserEntity {
   @Column()
   passwordHash!: string;
 
+  @Column({ type: 'text', nullable: true })
+  bio: string | null = null;
+
   @Column()
   displayName!: string;
 
   @Column({ nullable: true })
   avatarUrl?: string;
+
+  @Column({ nullable: true })
+  avatarFileId?: string;
 
   @Column({ default: false })
   isEmailVerified!: boolean;

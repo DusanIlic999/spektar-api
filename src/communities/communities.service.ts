@@ -1,6 +1,8 @@
 import {
   ConflictException,
   ForbiddenException,
+  forwardRef,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -13,6 +15,7 @@ import { CreateCommunityDto } from './dto/create-community.dto';
 import { UpdateCommunityDto } from './dto/update-community.dto';
 import { UserEntity } from '../users/users.entity';
 import { ImageKitService } from '../imagekit/imagekit.service';
+import { UsersService } from 'src/users/users.service';
 
 @Injectable()
 export class CommunitiesService {
@@ -22,6 +25,8 @@ export class CommunitiesService {
     @InjectRepository(CommunityMemberEntity)
     private readonly membersRepository: Repository<CommunityMemberEntity>,
     private readonly imageKitService: ImageKitService,
+    @Inject(forwardRef(() => UsersService))
+    private readonly userService: UsersService,
   ) {}
 
   private generateSlug(name: string): string {
@@ -114,8 +119,39 @@ export class CommunitiesService {
       postCount: parseInt(raw[index].community_postCount, 10),
     }));
   }
+  async findPublic(): Promise<CommunityEntity[]> {
+    const { entities, raw } = await this.communitiesRepository
+      .createQueryBuilder('community')
+      .addSelect(
+        (qb) =>
+          qb
+            .subQuery()
+            .select('COUNT(*)', 'count')
+            .from(CommunityMemberEntity, 'member')
+            .where('member.communityId = community.id'),
+        'community_memberCount',
+      )
+      .addSelect(
+        (qb) =>
+          qb
+            .subQuery()
+            .select('COUNT(*)', 'count')
+            .from(PostEntity, 'post')
+            .where('post.communityId = community.id'),
+        'community_postCount',
+      )
+      .getRawAndEntities();
 
-  async findBySlug(slug: string): Promise<CommunityEntity> {
+    return entities
+      .map((entity, index) => ({
+        ...entity,
+        memberCount: parseInt(raw[index].community_memberCount, 10),
+        postCount: parseInt(raw[index].community_postCount, 10),
+      }))
+      .filter((comm) => comm.type === CommunityType.PUBLIC);
+  }
+
+  async findBySlug(slug: string, userId?: string): Promise<CommunityEntity> {
     const { entities, raw } = await this.communitiesRepository
       .createQueryBuilder('community')
       .where('community.slug = :slug', { slug })
@@ -143,8 +179,15 @@ export class CommunitiesService {
     if (!community) {
       throw new NotFoundException(`Community with slug "${slug}" not found`);
     }
+    const isMember = userId
+      ? await this.membersRepository.findOne({
+          where: { community: { id: community.id }, user: { id: userId } },
+          relations: { user: true, community: true },
+        })
+      : null;
     community.memberCount = parseInt(raw[0].community_memberCount, 10);
     community.postCount = parseInt(raw[0].community_postCount, 10);
+    community.currentMember = isMember ? true : false;
     return community;
   }
 
@@ -262,12 +305,19 @@ export class CommunitiesService {
     const community = await this.findById(communityId);
     await this.requireModeratorOrOwner(communityId, userId);
 
-    community.coverImageUrl = await this.imageKitService.uploadImage(
+    const oldFileId = community.coverImageFileId;
+    const uploadedImage = await this.imageKitService.uploadImage(
       file,
       '/communities',
     );
 
-    return this.communitiesRepository.save(community);
+    community.coverImageUrl = uploadedImage.url;
+    community.coverImageFileId = uploadedImage.fileId;
+
+    const saved = await this.communitiesRepository.save(community);
+    await this.imageKitService.deleteImage(oldFileId);
+
+    return saved;
   }
 
   async requireModeratorOrOwner(
