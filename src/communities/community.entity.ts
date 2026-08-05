@@ -60,6 +60,8 @@ export class CommunityEntity {
 
   currentMember?: boolean;
 
+  hasPendingJoinRequest?: boolean;
+
   postCount?: number;
 
   @CreateDateColumn()

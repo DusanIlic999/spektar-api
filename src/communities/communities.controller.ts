@@ -48,6 +48,12 @@ export class CommunitiesController {
     return this.communitiesService.findByMember(req.user.userId);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Get('join-requests/me')
+  async findMyJoinRequests(@Req() req: any) {
+    return this.communitiesService.findMyJoinRequests(req.user.userId);
+  }
+
   @UseGuards(OptionalJwtAuthGuard)
   @Get(':slug')
   async findBySlug(@Param('slug') slug: string, @Req() req: any) {
@@ -63,6 +69,53 @@ export class CommunitiesController {
   @Post(':id/join')
   async join(@Param('id') communityId: string, @Req() req: any) {
     return this.communitiesService.join(communityId, req.user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/join-requests')
+  async findJoinRequests(@Param('id') communityId: string, @Req() req: any) {
+    return this.communitiesService.findJoinRequests(
+      communityId,
+      req.user.userId,
+    );
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/join-requests/me')
+  async findMyJoinRequest(@Param('id') communityId: string, @Req() req: any) {
+    return this.communitiesService.findMyJoinRequest(
+      communityId,
+      req.user.userId,
+    );
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/join-requests/:requestId/approve')
+  async approveJoinRequest(
+    @Param('id') communityId: string,
+    @Param('requestId') requestId: string,
+    @Req() req: any,
+  ) {
+    return this.communitiesService.approveJoinRequest(
+      communityId,
+      requestId,
+      req.user.userId,
+    );
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/join-requests/:requestId/reject')
+  async rejectJoinRequest(
+    @Param('id') communityId: string,
+    @Param('requestId') requestId: string,
+    @Req() req: any,
+  ) {
+    await this.communitiesService.rejectJoinRequest(
+      communityId,
+      requestId,
+      req.user.userId,
+    );
+    return { success: true };
   }
 
   @UseGuards(JwtAuthGuard)

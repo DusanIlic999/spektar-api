@@ -10,6 +10,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CommunityEntity, CommunityType } from './community.entity';
 import { CommunityMemberEntity, MemberRole } from './community-member.entity';
+import { CommunityJoinRequestEntity } from './community-join-request.entity';
 import { PostEntity } from '../posts/post.entity';
 import { CreateCommunityDto } from './dto/create-community.dto';
 import { UpdateCommunityDto } from './dto/update-community.dto';
@@ -24,6 +25,8 @@ export class CommunitiesService {
     private readonly communitiesRepository: Repository<CommunityEntity>,
     @InjectRepository(CommunityMemberEntity)
     private readonly membersRepository: Repository<CommunityMemberEntity>,
+    @InjectRepository(CommunityJoinRequestEntity)
+    private readonly joinRequestsRepository: Repository<CommunityJoinRequestEntity>,
     private readonly imageKitService: ImageKitService,
     @Inject(forwardRef(() => UsersService))
     private readonly userService: UsersService,
@@ -185,9 +188,16 @@ export class CommunitiesService {
           relations: { user: true, community: true },
         })
       : null;
+    const pendingRequest =
+      userId && !isMember
+        ? await this.joinRequestsRepository.findOne({
+            where: { community: { id: community.id }, user: { id: userId } },
+          })
+        : null;
     community.memberCount = parseInt(raw[0].community_memberCount, 10);
     community.postCount = parseInt(raw[0].community_postCount, 10);
     community.currentMember = isMember ? true : false;
+    community.hasPendingJoinRequest = pendingRequest ? true : false;
     return community;
   }
 
@@ -222,7 +232,7 @@ export class CommunitiesService {
   async join(
     communityId: string,
     userId: string,
-  ): Promise<CommunityMemberEntity> {
+  ): Promise<CommunityMemberEntity | CommunityJoinRequestEntity> {
     const communityExists = await this.communitiesRepository.findOneBy({
       id: communityId,
     });
@@ -241,6 +251,25 @@ export class CommunitiesService {
       throw new ForbiddenException('Community is private.');
     }
 
+    if (communityExists.type === CommunityType.RESTRICTED) {
+      const existingRequest = await this.joinRequestsRepository.findOne({
+        where: { community: { id: communityId }, user: { id: userId } },
+      });
+
+      if (existingRequest) {
+        throw new ConflictException(
+          'A join request for this community is already pending',
+        );
+      }
+
+      const joinRequest = this.joinRequestsRepository.create({
+        user: { id: userId } as UserEntity,
+        community: communityExists,
+      });
+
+      return this.joinRequestsRepository.save(joinRequest);
+    }
+
     const membership = this.membersRepository.create({
       user: { id: userId } as UserEntity,
       community: communityExists,
@@ -248,6 +277,99 @@ export class CommunitiesService {
     });
 
     return this.membersRepository.save(membership);
+  }
+
+  async findJoinRequests(
+    communityId: string,
+    requesterId: string,
+  ): Promise<CommunityJoinRequestEntity[]> {
+    await this.requireModeratorOrOwner(communityId, requesterId);
+
+    return this.joinRequestsRepository.find({
+      where: { community: { id: communityId } },
+      relations: { user: true },
+      select: {
+        id: true,
+        createdAt: true,
+        user: {
+          id: true,
+          username: true,
+          displayName: true,
+          avatarUrl: true,
+        },
+      },
+      order: { createdAt: 'ASC' },
+    });
+  }
+
+  async findMyJoinRequests(userId: string): Promise<string[]> {
+    const requests = await this.joinRequestsRepository.find({
+      where: { user: { id: userId } },
+      relations: { community: true },
+      select: { id: true, community: { id: true } },
+    });
+
+    return requests.map((request) => request.community.id);
+  }
+
+  async findMyJoinRequest(
+    communityId: string,
+    userId: string,
+  ): Promise<CommunityJoinRequestEntity | null> {
+    return this.joinRequestsRepository.findOne({
+      where: { community: { id: communityId }, user: { id: userId } },
+    });
+  }
+
+  async approveJoinRequest(
+    communityId: string,
+    requestId: string,
+    requesterId: string,
+  ): Promise<CommunityMemberEntity> {
+    await this.requireModeratorOrOwner(communityId, requesterId);
+
+    const joinRequest = await this.joinRequestsRepository.findOne({
+      where: { id: requestId, community: { id: communityId } },
+      relations: { user: true, community: true },
+      select: {
+        id: true,
+        user: { id: true },
+        community: { id: true },
+      },
+    });
+
+    if (!joinRequest) {
+      throw new NotFoundException('Join request not found');
+    }
+
+    const membership = this.membersRepository.create({
+      user: joinRequest.user,
+      community: joinRequest.community,
+      role: MemberRole.MEMBER,
+    });
+
+    const savedMembership = await this.membersRepository.save(membership);
+    await this.joinRequestsRepository.delete({ id: joinRequest.id });
+
+    return savedMembership;
+  }
+
+  async rejectJoinRequest(
+    communityId: string,
+    requestId: string,
+    requesterId: string,
+  ): Promise<void> {
+    await this.requireModeratorOrOwner(communityId, requesterId);
+
+    const joinRequest = await this.joinRequestsRepository.findOne({
+      where: { id: requestId, community: { id: communityId } },
+    });
+
+    if (!joinRequest) {
+      throw new NotFoundException('Join request not found');
+    }
+
+    await this.joinRequestsRepository.delete({ id: joinRequest.id });
   }
   async disband(communityId: string, userId: string): Promise<void> {
     const communityExists = await this.communitiesRepository.findOneBy({
