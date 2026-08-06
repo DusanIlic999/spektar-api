@@ -466,6 +466,7 @@ export class CommunitiesService {
 
     return membership;
   }
+
   async changeRole(
     communityId: string,
     targetUserId: string,
@@ -477,22 +478,31 @@ export class CommunitiesService {
       requesterId,
     );
 
-    if (!requesterMembership || requesterMembership.role !== MemberRole.OWNER) {
-      throw new ForbiddenException('Only the owner can change member roles');
-    }
-
     const targetMembership = await this.findMembership(
       communityId,
       targetUserId,
     );
 
+    if (
+      !requesterMembership ||
+      requesterMembership.role === MemberRole.MEMBER
+    ) {
+      throw new ForbiddenException(
+        'Only the owner and moderator can change member roles',
+      );
+    }
+
     if (!targetMembership) {
       throw new NotFoundException('This user is not a member of the community');
+    }
+    if (targetMembership.role === MemberRole.OWNER) {
+      throw new ForbiddenException('You cant change owner role');
     }
 
     targetMembership.role = newRole;
     return this.membersRepository.save(targetMembership);
   }
+
   async removeMember(
     communityId: string,
     targetUserId: string,
