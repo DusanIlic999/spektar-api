@@ -499,6 +499,13 @@ export class CommunitiesService {
       throw new ForbiddenException('You cant change owner role');
     }
 
+    if (
+      requesterMembership.role === MemberRole.MODERATOR &&
+      targetMembership.role === MemberRole.MODERATOR
+    ) {
+      throw new ForbiddenException('Only the owner can change moderator role');
+    }
+
     targetMembership.role = newRole;
     return this.membersRepository.save(targetMembership);
   }
