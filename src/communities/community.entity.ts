@@ -43,7 +43,6 @@ export class CommunityEntity {
   @Column({
     type: 'enum',
     enum: CommunityCategory,
-    default: CommunityCategory.NEIGHBORHOOD,
   })
   category!: string;
 

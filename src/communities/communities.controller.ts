@@ -270,4 +270,14 @@ export class CommunitiesController {
     );
     return { success: true };
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete(':communityId')
+  async deleteCommunity(
+    @Param('communityId') communityId: string,
+    @Req() req: any,
+  ) {
+    await this.communitiesService.deleteCommunity(communityId, req.user.userId);
+    return { success: true };
+  }
 }

@@ -524,6 +524,28 @@ export class CommunitiesService {
     await this.membersRepository.delete({ id: targetMembership.id });
   }
 
+  async deleteCommunity(
+    communityId: string,
+    requesterId: string,
+  ): Promise<void> {
+    const requesterMembership = await this.requireModeratorOrOwner(
+      communityId,
+      requesterId,
+    );
+
+    const isCommunity = await this.findById(communityId);
+
+    if (!isCommunity) {
+      throw new NotFoundException('This is not a valid community');
+    }
+
+    if (requesterMembership.role !== MemberRole.OWNER) {
+      throw new ForbiddenException('Only the owner can delete this community');
+    }
+
+    await this.communitiesRepository.delete({ id: isCommunity.id });
+  }
+
   async inviteMember(
     communityId: string,
     username: string,
