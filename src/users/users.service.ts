@@ -64,6 +64,21 @@ export class UsersService {
     return await this.usersRepository.findOneBy({ email });
   }
 
+  async findByUsernameOrNull(username: string): Promise<UserEntity | null> {
+    return await this.usersRepository.findOneBy({ username });
+  }
+
+  async findAllExcluding(excludedIds: string[]): Promise<UserEntity[]> {
+    if (excludedIds.length === 0) {
+      return this.usersRepository.find();
+    }
+
+    return this.usersRepository
+      .createQueryBuilder('user')
+      .where('user.id NOT IN (:...excludedIds)', { excludedIds })
+      .getMany();
+  }
+
   async findById(id: string): Promise<UserEntity> {
     const user = await this.usersRepository.findOneBy({ id });
     if (user === null) {

@@ -11,12 +11,15 @@ import { Repository } from 'typeorm';
 import { CommunityEntity, CommunityType } from './community.entity';
 import { CommunityMemberEntity, MemberRole } from './community-member.entity';
 import { CommunityJoinRequestEntity } from './community-join-request.entity';
+import { CommunityInviteEntity } from './community-invite.entity';
 import { PostEntity } from '../posts/post.entity';
 import { CreateCommunityDto } from './dto/create-community.dto';
 import { UpdateCommunityDto } from './dto/update-community.dto';
 import { UserEntity } from '../users/users.entity';
 import { ImageKitService } from '../imagekit/imagekit.service';
 import { UsersService } from 'src/users/users.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationType } from '../notifications/notification.entity';
 
 @Injectable()
 export class CommunitiesService {
@@ -27,9 +30,12 @@ export class CommunitiesService {
     private readonly membersRepository: Repository<CommunityMemberEntity>,
     @InjectRepository(CommunityJoinRequestEntity)
     private readonly joinRequestsRepository: Repository<CommunityJoinRequestEntity>,
+    @InjectRepository(CommunityInviteEntity)
+    private readonly invitesRepository: Repository<CommunityInviteEntity>,
     private readonly imageKitService: ImageKitService,
     @Inject(forwardRef(() => UsersService))
     private readonly userService: UsersService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   private generateSlug(name: string): string {
@@ -516,5 +522,216 @@ export class CommunitiesService {
     }
 
     await this.membersRepository.delete({ id: targetMembership.id });
+  }
+
+  async inviteMember(
+    communityId: string,
+    username: string,
+    inviterId: string,
+  ): Promise<CommunityInviteEntity> {
+    await this.findById(communityId);
+    await this.requireModeratorOrOwner(communityId, inviterId);
+
+    const invitedUser = await this.userService.findByUsernameOrNull(username);
+    if (!invitedUser) {
+      throw new NotFoundException('User not found');
+    }
+
+    const existingMembership = await this.findMembership(
+      communityId,
+      invitedUser.id,
+    );
+    if (existingMembership) {
+      throw new ConflictException('User is already a member of this community');
+    }
+
+    const existingInvite = await this.invitesRepository.findOne({
+      where: {
+        community: { id: communityId },
+        invitedUser: { id: invitedUser.id },
+      },
+    });
+    if (existingInvite) {
+      throw new ConflictException('An invite for this user is already pending');
+    }
+
+    const invite = this.invitesRepository.create({
+      community: { id: communityId } as CommunityEntity,
+      invitedUser,
+      invitedBy: { id: inviterId } as UserEntity,
+    });
+
+    const savedInvite = await this.invitesRepository.save(invite);
+
+    await this.notificationsService.create({
+      recipientId: invitedUser.id,
+      actorId: inviterId,
+      type: NotificationType.COMMUNITY_INVITE,
+      communityId,
+    });
+
+    return savedInvite;
+  }
+
+  async findInvitableUsers(
+    communityId: string,
+    requesterId: string,
+  ): Promise<UserEntity[]> {
+    await this.requireModeratorOrOwner(communityId, requesterId);
+
+    const [members, invites] = await Promise.all([
+      this.membersRepository.find({
+        where: { community: { id: communityId } },
+        relations: { user: true },
+        select: { user: { id: true } },
+      }),
+      this.invitesRepository.find({
+        where: { community: { id: communityId } },
+        relations: { invitedUser: true },
+        select: { invitedUser: { id: true } },
+      }),
+    ]);
+
+    const excludedIds = [
+      ...members.map((member) => member.user.id),
+      ...invites.map((invite) => invite.invitedUser.id),
+    ];
+
+    return this.userService.findAllExcluding(excludedIds);
+  }
+
+  async findInvites(
+    communityId: string,
+    requesterId: string,
+  ): Promise<CommunityInviteEntity[]> {
+    await this.requireModeratorOrOwner(communityId, requesterId);
+
+    return this.invitesRepository.find({
+      where: { community: { id: communityId } },
+      relations: { invitedUser: true, invitedBy: true },
+      select: {
+        id: true,
+        createdAt: true,
+        invitedUser: {
+          id: true,
+          username: true,
+          displayName: true,
+          avatarUrl: true,
+        },
+        invitedBy: {
+          id: true,
+          username: true,
+          displayName: true,
+          avatarUrl: true,
+        },
+      },
+      order: { createdAt: 'ASC' },
+    });
+  }
+
+  async findMyInvites(userId: string): Promise<CommunityInviteEntity[]> {
+    return this.invitesRepository.find({
+      where: { invitedUser: { id: userId } },
+      relations: { community: true, invitedBy: true },
+      select: {
+        id: true,
+        createdAt: true,
+        community: true,
+        invitedBy: {
+          id: true,
+          username: true,
+          displayName: true,
+          avatarUrl: true,
+        },
+      },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async findMyInvite(
+    communityId: string,
+    userId: string,
+  ): Promise<CommunityInviteEntity | null> {
+    return this.invitesRepository.findOne({
+      where: { community: { id: communityId }, invitedUser: { id: userId } },
+    });
+  }
+
+  async acceptInvite(
+    communityId: string,
+    inviteId: string,
+    userId: string,
+  ): Promise<CommunityMemberEntity> {
+    const invite = await this.invitesRepository.findOne({
+      where: { id: inviteId, community: { id: communityId } },
+      relations: { invitedUser: true, community: true },
+      select: {
+        id: true,
+        invitedUser: { id: true },
+        community: { id: true },
+      },
+    });
+
+    if (!invite) {
+      throw new NotFoundException('Invite not found');
+    }
+
+    if (invite.invitedUser.id !== userId) {
+      throw new ForbiddenException('This invite does not belong to you');
+    }
+
+    const membership = this.membersRepository.create({
+      user: invite.invitedUser,
+      community: invite.community,
+      role: MemberRole.MEMBER,
+    });
+
+    const savedMembership = await this.membersRepository.save(membership);
+    await this.invitesRepository.delete({ id: invite.id });
+
+    return savedMembership;
+  }
+
+  async declineInvite(
+    communityId: string,
+    inviteId: string,
+    userId: string,
+  ): Promise<void> {
+    const invite = await this.invitesRepository.findOne({
+      where: { id: inviteId, community: { id: communityId } },
+      relations: { invitedUser: true },
+      select: {
+        id: true,
+        invitedUser: { id: true },
+      },
+    });
+
+    if (!invite) {
+      throw new NotFoundException('Invite not found');
+    }
+
+    if (invite.invitedUser.id !== userId) {
+      throw new ForbiddenException('This invite does not belong to you');
+    }
+
+    await this.invitesRepository.delete({ id: invite.id });
+  }
+
+  async revokeInvite(
+    communityId: string,
+    inviteId: string,
+    requesterId: string,
+  ): Promise<void> {
+    await this.requireModeratorOrOwner(communityId, requesterId);
+
+    const invite = await this.invitesRepository.findOne({
+      where: { id: inviteId, community: { id: communityId } },
+    });
+
+    if (!invite) {
+      throw new NotFoundException('Invite not found');
+    }
+
+    await this.invitesRepository.delete({ id: invite.id });
   }
 }

@@ -13,6 +13,7 @@ export enum NotificationType {
   NEW_COMMENT = 'new_comment',
   NEW_REPLY = 'new_reply',
   NEW_MEMBER = 'new_member',
+  COMMUNITY_INVITE = 'community_invite',
 }
 
 @Entity('notification')

@@ -18,6 +18,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { CommunitiesService } from './communities.service';
 import { CreateCommunityDto } from './dto/create-community.dto';
 import { UpdateCommunityDto } from './dto/update-community.dto';
+import { InviteMemberDto } from './dto/invite-member.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { MemberRole } from './community-member.entity';
@@ -52,6 +53,12 @@ export class CommunitiesController {
   @Get('join-requests/me')
   async findMyJoinRequests(@Req() req: any) {
     return this.communitiesService.findMyJoinRequests(req.user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('invites/me')
+  async findMyInvites(@Req() req: any) {
+    return this.communitiesService.findMyInvites(req.user.userId);
   }
 
   @UseGuards(OptionalJwtAuthGuard)
@@ -113,6 +120,86 @@ export class CommunitiesController {
     await this.communitiesService.rejectJoinRequest(
       communityId,
       requestId,
+      req.user.userId,
+    );
+    return { success: true };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/invitable-users')
+  async findInvitableUsers(@Param('id') communityId: string, @Req() req: any) {
+    const users = await this.communitiesService.findInvitableUsers(
+      communityId,
+      req.user.userId,
+    );
+    return users.map(({ passwordHash, ...rest }) => rest);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/invites')
+  async inviteMember(
+    @Param('id') communityId: string,
+    @Body() dto: InviteMemberDto,
+    @Req() req: any,
+  ) {
+    return this.communitiesService.inviteMember(
+      communityId,
+      dto.username,
+      req.user.userId,
+    );
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/invites')
+  async findInvites(@Param('id') communityId: string, @Req() req: any) {
+    return this.communitiesService.findInvites(communityId, req.user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/invites/me')
+  async findMyInvite(@Param('id') communityId: string, @Req() req: any) {
+    return this.communitiesService.findMyInvite(communityId, req.user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/invites/:inviteId/accept')
+  async acceptInvite(
+    @Param('id') communityId: string,
+    @Param('inviteId') inviteId: string,
+    @Req() req: any,
+  ) {
+    return this.communitiesService.acceptInvite(
+      communityId,
+      inviteId,
+      req.user.userId,
+    );
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/invites/:inviteId/decline')
+  async declineInvite(
+    @Param('id') communityId: string,
+    @Param('inviteId') inviteId: string,
+    @Req() req: any,
+  ) {
+    await this.communitiesService.declineInvite(
+      communityId,
+      inviteId,
+      req.user.userId,
+    );
+    return { success: true };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete(':id/invites/:inviteId')
+  async revokeInvite(
+    @Param('id') communityId: string,
+    @Param('inviteId') inviteId: string,
+    @Req() req: any,
+  ) {
+    await this.communitiesService.revokeInvite(
+      communityId,
+      inviteId,
       req.user.userId,
     );
     return { success: true };
