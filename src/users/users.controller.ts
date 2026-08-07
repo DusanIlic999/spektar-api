@@ -24,8 +24,6 @@ import { OptionalJwtAuthGuard } from 'src/auth/optional-jwt-auth.guard';
 import { PostsService } from 'src/posts/posts.service';
 import { EditUserDto } from './dto/edit-user.dto';
 
-// CETVRTA STVAR NA COMMUNITY PAGE IZLAZAK IZ COMMUNITY
-
 @Controller('users')
 export class UsersController {
   constructor(
