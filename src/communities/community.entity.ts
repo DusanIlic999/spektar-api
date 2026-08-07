@@ -52,7 +52,7 @@ export class CommunityEntity {
   @Column({ nullable: true })
   coverImageFileId?: string;
 
-  @Column({ type: 'string' })
+  @Column({ type: 'varchar', length: 255, nullable: true })
   location!: string;
 
   @OneToMany(() => CommunityMemberEntity, (member) => member.community)
