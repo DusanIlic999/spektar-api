@@ -74,6 +74,8 @@ export class CommunitiesService {
       description: dto.description,
       type: dto.type,
       slug,
+      category: dto.category,
+      location: dto.location,
     });
 
     let savedCommunity: CommunityEntity;

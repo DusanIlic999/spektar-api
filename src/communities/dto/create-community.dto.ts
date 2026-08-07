@@ -18,4 +18,8 @@ export class CreateCommunityDto {
   @IsNotEmpty()
   @IsEnum(CommunityCategory)
   category!: string;
+
+  @IsNotEmpty()
+  @IsString()
+  location!: string;
 }
