@@ -240,6 +240,38 @@ export class PostsService {
     return this.attachSavedFlag(posts, userId);
   }
 
+  async findSaved(
+    userId: string,
+  ): Promise<(PostEntity & { saved: boolean })[]> {
+    const savedRows = await this.savedPostsRepository.find({
+      where: { user: { id: userId } },
+      relations: { post: { author: true, community: true } },
+      select: {
+        post: {
+          id: true,
+          title: true,
+          content: true,
+          type: true,
+          imageUrl: true,
+          imageFileId: true,
+          upvoteCount: true,
+          downvoteCount: true,
+          createdAt: true,
+          author: {
+            id: true,
+            displayName: true,
+            avatarUrl: true,
+            username: true,
+          },
+          community: true,
+        },
+      },
+      order: { createdAt: 'DESC' },
+    });
+
+    return savedRows.map((row) => ({ ...row.post, saved: true }));
+  }
+
   async toggleSave(
     postId: string,
     userId: string,

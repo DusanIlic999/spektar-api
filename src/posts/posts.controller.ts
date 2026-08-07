@@ -55,6 +55,12 @@ export class PostsController {
     return { success: true };
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Get('saved')
+  async findSaved(@Req() req: any) {
+    return this.postsService.findSaved(req.user.userId);
+  }
+
   @UseGuards(OptionalJwtAuthGuard)
   @Get(':id')
   async findById(@Param('id') postId: string, @Req() req: any) {
