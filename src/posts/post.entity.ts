@@ -53,6 +53,9 @@ export class PostEntity {
   @Column({ type: 'int', default: 0 })
   downvoteCount!: number;
 
+  @Column({ type: 'boolean', default: false })
+  saved!: boolean;
+
   @CreateDateColumn()
   createdAt!: Date;
 
