@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { CreatePostDto } from './dto/create-post.dto';
 import { PostEntity } from './post.entity';
 import { CommunitiesService } from '../communities/communities.service';
@@ -29,7 +29,10 @@ export class PostsService {
     private readonly imageKitService: ImageKitService,
   ) {}
 
-  async findById(postId: string): Promise<PostEntity> {
+  async findById(
+    postId: string,
+    userId?: string,
+  ): Promise<PostEntity & { saved: boolean }> {
     const post = await this.postsRepository.findOne({
       where: { id: postId },
       relations: { author: true, community: true },
@@ -47,7 +50,32 @@ export class PostsService {
       throw new NotFoundException('Post not found');
     }
 
-    return post;
+    const [postWithSaved] = await this.attachSavedFlag([post], userId);
+    return postWithSaved;
+  }
+
+  private async attachSavedFlag<T extends PostEntity>(
+    posts: T[],
+    userId?: string,
+  ): Promise<(T & { saved: boolean })[]> {
+    if (!userId || posts.length === 0) {
+      return posts.map((post) => ({ ...post, saved: false }));
+    }
+
+    const savedRows = await this.savedPostsRepository.find({
+      where: {
+        user: { id: userId },
+        post: { id: In(posts.map((post) => post.id)) },
+      },
+      relations: { post: true },
+    });
+
+    const savedPostIds = new Set(savedRows.map((row) => row.post.id));
+
+    return posts.map((post) => ({
+      ...post,
+      saved: savedPostIds.has(post.id),
+    }));
   }
   async create(
     dto: CreatePostDto,
@@ -129,7 +157,10 @@ export class PostsService {
     await this.postsRepository.increment({ id: postId }, newField, 1);
   }
 
-  async findByCommunity(slug: string, userId?: string): Promise<PostEntity[]> {
+  async findByCommunity(
+    slug: string,
+    userId?: string,
+  ): Promise<(PostEntity & { saved: boolean })[]> {
     const community = await this.communitiesService.findBySlug(slug);
 
     if (community.type !== CommunityType.PUBLIC) {
@@ -151,7 +182,7 @@ export class PostsService {
       }
     }
 
-    return await this.postsRepository.find({
+    const posts = await this.postsRepository.find({
       where: { community: { slug: slug } },
       relations: { author: true, community: true },
       select: {
@@ -164,11 +195,16 @@ export class PostsService {
       },
       order: { createdAt: 'DESC' },
     });
+
+    return this.attachSavedFlag(posts, userId);
   }
 
-  async findByAuthor(userId: string): Promise<PostEntity[]> {
-    return await this.postsRepository.find({
-      where: { author: { id: userId } },
+  async findByAuthor(
+    authorId: string,
+    viewerId?: string,
+  ): Promise<(PostEntity & { saved: boolean })[]> {
+    const posts = await this.postsRepository.find({
+      where: { author: { id: authorId } },
       relations: { author: true, community: true },
       select: {
         author: {
@@ -180,10 +216,14 @@ export class PostsService {
       },
       order: { createdAt: 'DESC' },
     });
+
+    return this.attachSavedFlag(posts, viewerId);
   }
 
-  async findFromPublic(): Promise<PostEntity[]> {
-    return await this.postsRepository.find({
+  async findFromPublic(
+    userId?: string,
+  ): Promise<(PostEntity & { saved: boolean })[]> {
+    const posts = await this.postsRepository.find({
       where: { community: { type: CommunityType.PUBLIC } },
       relations: { author: true, community: true },
       select: {
@@ -196,6 +236,8 @@ export class PostsService {
       },
       order: { createdAt: 'DESC' },
     });
+
+    return this.attachSavedFlag(posts, userId);
   }
 
   async toggleSave(
@@ -213,9 +255,13 @@ export class PostsService {
       },
     });
     if (existingSave) {
+      post.saved = false;
+      await this.postsRepository.save(post);
       await this.savedPostsRepository.delete({ id: existingSave.id });
       return { saved: false };
     } else {
+      post.saved = true;
+      await this.postsRepository.save(post);
       const newSave = this.savedPostsRepository.create({
         post: { id: postId } as PostEntity,
         user: { id: userId } as UserEntity,

@@ -55,9 +55,10 @@ export class PostsController {
     return { success: true };
   }
 
+  @UseGuards(OptionalJwtAuthGuard)
   @Get(':id')
-  async findById(@Param('id') postId: string) {
-    return this.postsService.findById(postId);
+  async findById(@Param('id') postId: string, @Req() req: any) {
+    return this.postsService.findById(postId, req.user?.userId);
   }
 
   @UseGuards(OptionalJwtAuthGuard)
@@ -79,8 +80,9 @@ export class PostsController {
     return { success: true };
   }
 
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('public/all')
-  async findAllPublicPosts() {
-    return await this.postsService.findFromPublic();
+  async findAllPublicPosts(@Req() req: any) {
+    return await this.postsService.findFromPublic(req.user?.userId);
   }
 }

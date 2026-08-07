@@ -20,6 +20,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from 'src/auth/optional-jwt-auth.guard';
 import { PostsService } from 'src/posts/posts.service';
 import { EditUserDto } from './dto/edit-user.dto';
 
@@ -44,7 +45,10 @@ export class UsersController {
   @Get('me')
   async getProfile(@Req() req) {
     const user = await this.usersService.findByEmail(req.user.email);
-    const posts = await this.postsService.findByAuthor(user.id);
+    const posts = await this.postsService.findByAuthor(
+      user.id,
+      req.user.userId,
+    );
     const { passwordHash, ...result } = user;
     return { ...result, posts };
   }
@@ -56,10 +60,14 @@ export class UsersController {
     return withoutPasswordHash;
   }
 
+  @UseGuards(OptionalJwtAuthGuard)
   @Get(':username')
   async getByUsername(@Param('username') username: string, @Req() req) {
     const user = await this.usersService.findByUsername(username);
-    const posts = await this.postsService.findByAuthor(user.id);
+    const posts = await this.postsService.findByAuthor(
+      user.id,
+      req.user?.userId,
+    );
     const { passwordHash, ...rest } = user;
     return { ...rest, posts };
   }
