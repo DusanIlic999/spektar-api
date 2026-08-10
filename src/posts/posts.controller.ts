@@ -89,6 +89,6 @@ export class PostsController {
   @UseGuards(OptionalJwtAuthGuard)
   @Get('public/all')
   async findAllPublicPosts(@Req() req: any) {
-    return await this.postsService.findFromPublic(req.user?.userId);
+    return await this.postsService.findPublicAndUsers(req.user?.userId);
   }
 }
