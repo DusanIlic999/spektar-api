@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { FindOptionsWhere, In, Repository } from 'typeorm';
 import { CreatePostDto } from './dto/create-post.dto';
 import { PostEntity } from './post.entity';
 import { CommunitiesService } from '../communities/communities.service';
@@ -220,11 +220,27 @@ export class PostsService {
     return this.attachSavedFlag(posts, viewerId);
   }
 
-  async findFromPublic(
+  async findPublicAndUsers(
     userId?: string,
   ): Promise<(PostEntity & { saved: boolean })[]> {
+    const where: FindOptionsWhere<PostEntity>[] = [
+      { community: { type: CommunityType.PUBLIC } },
+    ];
+
+    if (userId) {
+      const memberCommunities =
+        await this.communitiesService.findByMember(userId);
+      const memberCommunityIds = memberCommunities.map(
+        (community) => community.id,
+      );
+
+      if (memberCommunityIds.length > 0) {
+        where.push({ community: { id: In(memberCommunityIds) } });
+      }
+    }
+
     const posts = await this.postsRepository.find({
-      where: { community: { type: CommunityType.PUBLIC } },
+      where,
       relations: { author: true, community: true },
       select: {
         author: {
