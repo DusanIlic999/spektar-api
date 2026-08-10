@@ -257,6 +257,21 @@ export class CommunitiesController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Patch(':communityId/make/:userId/owner')
+  async makeOWner(
+    @Param('communityId') communityId: string,
+    @Param('userId') targetUserId: string,
+    @Req() req: any,
+  ) {
+    return this.communitiesService.changeRole(
+      communityId,
+      targetUserId,
+      MemberRole.OWNER,
+      req.user.userId,
+    );
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Delete(':communityId/members/:userId')
   async removeMember(
     @Param('communityId') communityId: string,
