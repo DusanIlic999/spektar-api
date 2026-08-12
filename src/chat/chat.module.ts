@@ -16,7 +16,7 @@ import { MessageEntity } from './message.entity';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         secret: config.get('JWT_SECRET'),
-        signOptions: { expiresIn: '24h' },
+        signOptions: { expiresIn: '12h' },
       }),
     }),
   ],
