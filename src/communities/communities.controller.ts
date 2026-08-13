@@ -212,6 +212,15 @@ export class CommunitiesController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Post(':id/disband/member/:userId')
+  async disbandMember(
+    @Param('id') communityId: string,
+    @Param('userId') userId,
+  ) {
+    return this.communitiesService.disband(communityId, userId as string);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Patch(':id')
   async update(
     @Param('id') id: string,
