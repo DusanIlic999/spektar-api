@@ -32,6 +32,12 @@ export class UserEntity {
   @Column({ nullable: true })
   avatarFileId?: string;
 
+  @Column({ nullable: true })
+  coverUrl?: string;
+
+  @Column({ nullable: true })
+  coverFileId?: string;
+
   @Column({ default: false })
   isEmailVerified!: boolean;
 

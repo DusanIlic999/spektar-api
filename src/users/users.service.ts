@@ -128,4 +128,25 @@ export class UsersService {
 
     return await this.findById(id);
   }
+
+  async updateImage(
+    file: Express.Multer.File,
+    userId: string,
+  ): Promise<UserEntity> {
+    const user = await this.findById(userId);
+
+    const oldFileId = user.coverFileId;
+    const uploadedImage = await this.imageKitService.uploadImage(
+      file,
+      '/users',
+    );
+
+    user.coverUrl = uploadedImage.url;
+    user.coverFileId = uploadedImage.fileId;
+
+    const saved = await this.usersRepository.save(user);
+    await this.imageKitService.deleteImage(oldFileId);
+
+    return saved;
+  }
 }

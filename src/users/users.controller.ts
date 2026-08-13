@@ -9,6 +9,7 @@ import {
   MaxFileSizeValidator,
   Param,
   ParseFilePipe,
+  Patch,
   Post,
   Put,
   Req,
@@ -94,5 +95,22 @@ export class UsersController {
     image: Express.Multer.File | undefined,
   ) {
     return this.usersService.edit(req.user.userId, userData, image);
+  }
+  @UseGuards(JwtAuthGuard)
+  @Patch('image')
+  @UseInterceptors(FileInterceptor('image'))
+  updateImage(
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }),
+          new FileTypeValidator({ fileType: /^image\/(jpeg|png|webp|gif)$/ }),
+        ],
+      }),
+    )
+    image: Express.Multer.File,
+    @Req() req: any,
+  ) {
+    return this.usersService.updateImage(image, req.user.userId);
   }
 }
