@@ -22,9 +22,7 @@ export class ChatService {
     recipientId: string,
   ): Promise<ConversationEntity> {
     if (userId === recipientId) {
-      throw new ForbiddenException(
-        'Ne možeš započeti razgovor sa samim sobom',
-      );
+      throw new ForbiddenException('Ne možeš započeti razgovor sa samim sobom');
     }
 
     const [participantOneId, participantTwoId] = [userId, recipientId].sort();
@@ -173,14 +171,17 @@ export class ChatService {
     };
   }
 
+  findUnreadMessages = () => {
+    return this.messagesRepository.findAndCount({
+      where: { isRead: false },
+    });
+  };
+
   async markConversationAsRead(
     conversationId: string,
     userId: string,
   ): Promise<{ updated: number }> {
-    const conversation = await this.getConversationById(
-      conversationId,
-      userId,
-    );
+    const conversation = await this.getConversationById(conversationId, userId);
 
     const result = await this.messagesRepository.update(
       {

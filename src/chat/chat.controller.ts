@@ -24,10 +24,7 @@ export class ChatController {
   ) {}
 
   @Post('conversations')
-  async startConversation(
-    @Body() dto: StartConversationDto,
-    @Req() req: any,
-  ) {
+  async startConversation(@Body() dto: StartConversationDto, @Req() req: any) {
     return this.chatService.findOrCreateConversation(
       req.user.userId,
       dto.recipientId,
@@ -74,5 +71,10 @@ export class ChatController {
   @Patch('conversations/:id/read')
   async markAsRead(@Param('id') id: string, @Req() req: any) {
     return this.chatService.markConversationAsRead(id, req.user.userId);
+  }
+
+  @Get('unread/messages')
+  async findUnread() {
+    return this.chatService.findUnreadMessages();
   }
 }
