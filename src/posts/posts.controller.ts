@@ -19,16 +19,10 @@ import { OptionalJwtAuthGuard } from 'src/auth/optional-jwt-auth.guard';
 import { CreatePostDto } from './dto/create-post.dto';
 import { PostsService } from './posts.service';
 import { VoteDto } from './dto/vote.dto';
-import { UsersService } from 'src/users/users.service';
-import { CommunitiesService } from 'src/communities/communities.service';
 
 @Controller('posts')
 export class PostsController {
-  constructor(
-    private readonly postsService: PostsService,
-    private readonly usersService: UsersService,
-    private readonly communitiesService: CommunitiesService
-  ) {}
+  constructor(private readonly postsService: PostsService) {}
 
   @UseGuards(JwtAuthGuard)
   @Post()

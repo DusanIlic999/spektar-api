@@ -8,22 +8,12 @@ import { FindOptionsWhere, In, Repository } from 'typeorm';
 import { CreatePostDto } from './dto/create-post.dto';
 import { PostEntity } from './post.entity';
 import { CommunitiesService } from '../communities/communities.service';
-import {
-  CommunityEntity,
-  CommunityType,
-} from '../communities/community.entity';
+import { CommunityType } from '../communities/community.entity';
 import { UserEntity } from '../users/users.entity';
 import { UsersService } from 'src/users/users.service';
 import { PostVoteEntity } from './post-vote.entity';
 import { SavedPostEntity } from './saved-post.entity';
 import { ImageKitService } from '../imagekit/imagekit.service';
-
-export type CommunityWithMembership = CommunityEntity & { isMember: boolean };
-
-export type PostResponse = Omit<PostEntity, 'community'> & {
-  saved: boolean;
-  community: CommunityWithMembership;
-};
 
 @Injectable()
 export class PostsService {
@@ -42,7 +32,7 @@ export class PostsService {
   async findById(
     postId: string,
     userId?: string,
-  ): Promise<PostEntity & { saved: boolean }> {
+  ): Promise<PostEntity & { saved: boolean; isMember: boolean }> {
     const post = await this.postsRepository.findOne({
       where: { id: postId },
       relations: { author: true, community: true },
@@ -61,7 +51,17 @@ export class PostsService {
     }
 
     const [postWithSaved] = await this.attachSavedFlag([post], userId);
-    return postWithSaved;
+
+    const isMember = userId
+      ? Boolean(
+          await this.communitiesService.findMembership(
+            post.community.id,
+            userId,
+          ),
+        )
+      : false;
+
+    return { ...postWithSaved, isMember };
   }
 
   private async attachSavedFlag<T extends PostEntity>(
@@ -170,25 +170,30 @@ export class PostsService {
   async findByCommunity(
     slug: string,
     userId?: string,
-  ): Promise<PostResponse[]> {
+  ): Promise<(PostEntity & { saved: boolean })[]> {
     const community = await this.communitiesService.findBySlug(slug);
 
-    const isMember = userId
-      ? Boolean(
-          await this.communitiesService.findMembership(community.id, userId),
-        )
-      : false;
+    if (community.type !== CommunityType.PUBLIC) {
+      if (!userId) {
+        throw new ForbiddenException(
+          'You must be logged in to view this community',
+        );
+      }
 
-    if (community.type !== CommunityType.PUBLIC && !isMember) {
-      throw new ForbiddenException(
-        userId
-          ? 'You must be a member of this community to view its posts'
-          : 'You must be logged in to view this community',
+      const membership = await this.communitiesService.findMembership(
+        community.id,
+        userId,
       );
+
+      if (!membership) {
+        throw new ForbiddenException(
+          'You must be a member of this community to view its posts',
+        );
+      }
     }
 
     const posts = await this.postsRepository.find({
-      where: { community: { id: community.id } },
+      where: { community: { slug: slug } },
       relations: { author: true, community: true },
       select: {
         author: {
@@ -201,12 +206,7 @@ export class PostsService {
       order: { createdAt: 'DESC' },
     });
 
-    const withSaved = await this.attachSavedFlag(posts, userId);
-
-    return withSaved.map((post) => ({
-      ...post,
-      community: { ...post.community, isMember },
-    }));
+    return this.attachSavedFlag(posts, userId);
   }
 
   async findByAuthor(
