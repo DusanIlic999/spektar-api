@@ -179,7 +179,7 @@ export class PostsService {
         )
       : false;
 
-    if (community.type !== CommunityType /*  */.PUBLIC && !isMember) {
+    if (community.type !== CommunityType.PUBLIC && !isMember) {
       throw new ForbiddenException(
         userId
           ? 'You must be a member of this community to view its posts'
