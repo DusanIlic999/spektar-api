@@ -5,11 +5,13 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { UserEntity } from './users.entity';
 import { PostsModule } from 'src/posts/posts.module';
 import { ImageKitModule } from 'src/imagekit/imagekit.module';
+import { CommunitiesModule } from 'src/communities/communities.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([UserEntity]),
     forwardRef(() => PostsModule),
+    forwardRef(() => CommunitiesModule),
     ImageKitModule,
   ],
   providers: [UsersService],

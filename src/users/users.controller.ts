@@ -24,6 +24,7 @@ import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from 'src/auth/optional-jwt-auth.guard';
 import { PostsService } from 'src/posts/posts.service';
 import { EditUserDto } from './dto/edit-user.dto';
+import { CommunitiesService } from 'src/communities/communities.service';
 
 @Controller('users')
 export class UsersController {
@@ -31,6 +32,8 @@ export class UsersController {
     private readonly usersService: UsersService,
     @Inject(forwardRef(() => PostsService))
     private readonly postsService: PostsService,
+    @Inject(forwardRef(() => CommunitiesService))
+    private readonly communitiesService: CommunitiesService,
   ) {}
 
   @Post('/')
@@ -48,8 +51,23 @@ export class UsersController {
       user.id,
       req.user.userId,
     );
+
+    const memberCommunities = await this.communitiesService.findByMember(
+      user.id,
+    );
+    const memberCommunityIds = new Set(
+      memberCommunities.map((community) => community.id),
+    );
+    const postsWithMembership = posts.map((post) => ({
+      ...post,
+      community: {
+        ...post.community,
+        currentMember: memberCommunityIds.has(post.community.id),
+      },
+    }));
+
     const { passwordHash, ...result } = user;
-    return { ...result, posts };
+    return { ...result, posts: postsWithMembership };
   }
 
   @Get('/')
