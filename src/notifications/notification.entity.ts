@@ -30,7 +30,7 @@ export class NotificationEntity {
   @Column({ type: 'enum', enum: NotificationType })
   type!: NotificationType;
 
-  @ManyToOne(() => PostEntity, { nullable: true })
+  @ManyToOne(() => PostEntity, { nullable: true, onDelete: 'CASCADE' })
   post?: PostEntity;
 
   @ManyToOne(() => CommunityEntity, { nullable: true })

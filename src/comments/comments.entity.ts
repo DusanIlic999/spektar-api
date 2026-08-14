@@ -20,10 +20,10 @@ export class CommentEntity {
   @ManyToOne(() => UserEntity)
   author!: UserEntity;
 
-  @ManyToOne(() => PostEntity)
+  @ManyToOne(() => PostEntity, { onDelete: 'CASCADE' })
   post!: PostEntity;
 
-  @ManyToOne(() => CommentEntity, { nullable: true })
+  @ManyToOne(() => CommentEntity, { nullable: true, onDelete: 'CASCADE' })
   parent?: CommentEntity;
 
   @CreateDateColumn()

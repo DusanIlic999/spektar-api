@@ -18,7 +18,7 @@ export class PostVoteEntity {
   @ManyToOne(() => UserEntity)
   user!: UserEntity;
 
-  @ManyToOne(() => PostEntity)
+  @ManyToOne(() => PostEntity, { onDelete: 'CASCADE' })
   post!: PostEntity;
 
   @Column({ type: 'int' })

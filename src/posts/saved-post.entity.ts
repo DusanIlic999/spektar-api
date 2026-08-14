@@ -17,7 +17,7 @@ export class SavedPostEntity {
   @ManyToOne(() => UserEntity)
   user!: UserEntity;
 
-  @ManyToOne(() => PostEntity)
+  @ManyToOne(() => PostEntity, { onDelete: 'CASCADE' })
   post!: PostEntity;
 
   @CreateDateColumn()
