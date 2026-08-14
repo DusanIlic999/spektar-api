@@ -8,12 +8,22 @@ import { FindOptionsWhere, In, Repository } from 'typeorm';
 import { CreatePostDto } from './dto/create-post.dto';
 import { PostEntity } from './post.entity';
 import { CommunitiesService } from '../communities/communities.service';
-import { CommunityType } from '../communities/community.entity';
+import {
+  CommunityEntity,
+  CommunityType,
+} from '../communities/community.entity';
 import { UserEntity } from '../users/users.entity';
 import { UsersService } from 'src/users/users.service';
 import { PostVoteEntity } from './post-vote.entity';
 import { SavedPostEntity } from './saved-post.entity';
 import { ImageKitService } from '../imagekit/imagekit.service';
+
+export type CommunityWithMembership = CommunityEntity & { isMember: boolean };
+
+export type PostResponse = Omit<PostEntity, 'community'> & {
+  saved: boolean;
+  community: CommunityWithMembership;
+};
 
 @Injectable()
 export class PostsService {
@@ -160,30 +170,25 @@ export class PostsService {
   async findByCommunity(
     slug: string,
     userId?: string,
-  ): Promise<(PostEntity & { saved: boolean })[]> {
+  ): Promise<PostResponse[]> {
     const community = await this.communitiesService.findBySlug(slug);
 
-    if (community.type !== CommunityType.PUBLIC) {
-      if (!userId) {
-        throw new ForbiddenException(
-          'You must be logged in to view this community',
-        );
-      }
+    const isMember = userId
+      ? Boolean(
+          await this.communitiesService.findMembership(community.id, userId),
+        )
+      : false;
 
-      const membership = await this.communitiesService.findMembership(
-        community.id,
-        userId,
+    if (community.type !== CommunityType /*  */.PUBLIC && !isMember) {
+      throw new ForbiddenException(
+        userId
+          ? 'You must be a member of this community to view its posts'
+          : 'You must be logged in to view this community',
       );
-
-      if (!membership) {
-        throw new ForbiddenException(
-          'You must be a member of this community to view its posts',
-        );
-      }
     }
 
     const posts = await this.postsRepository.find({
-      where: { community: { slug: slug } },
+      where: { community: { id: community.id } },
       relations: { author: true, community: true },
       select: {
         author: {
@@ -196,7 +201,12 @@ export class PostsService {
       order: { createdAt: 'DESC' },
     });
 
-    return this.attachSavedFlag(posts, userId);
+    const withSaved = await this.attachSavedFlag(posts, userId);
+
+    return withSaved.map((post) => ({
+      ...post,
+      community: { ...post.community, isMember },
+    }));
   }
 
   async findByAuthor(
