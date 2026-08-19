@@ -7,10 +7,12 @@ import {
   Get,
   UseGuards,
   Req,
+  Res,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { GoogleAuthGuard } from './oauth.guard';
+import { Response } from 'express';
 
 @Controller('auth')
 export class AuthController {
@@ -23,24 +25,23 @@ export class AuthController {
 
   @Get('google')
   @UseGuards(GoogleAuthGuard)
-  async googleAuth(@Req() req) {}
+  async googleAuth(@Req() req) {
+    // Guard automatski radi preusmeravanje
+  }
 
   @Get('google/callback')
   @UseGuards(GoogleAuthGuard)
   googleAuthRedirect(@Req() req, @Res() res: Response) {
-    // Ovde se nalaze podaci koje je Google vratio (ime, email, slika...)
+    // Sada TS zna da je ovo Express Response
     const user = req.user;
 
-    // TODO: Ovde u produkciji praviš svoj JWT token na osnovu 'user' objekta
-    // Za sada šaljemo samo osnovne podatke ili privremeni string da testiramo React
+    // Privremeni token ili ID za testiranje
     const token = 'neki_tvoj_jwt_token_ili_id';
 
-    // Promeni ovo na URL tvoje React aplikacije u produkciji ili lokalno!
-    // Ako testiraš lokalno React, ovde stavi http://localhost:5173/oauth-success
-    // Ako ti je React na Vercelu/Netlify-u, stavi tu adresu.
+    // Promenite localhost:5173 u URL vaše React aplikacije ako je u produkciji
     const frontendUrl = `http://localhost:5173/oauth-success?token=${token}&email=${user.email}`;
 
-    // Ovo preusmerava brauzer sa bekenda direktno na frontend aplikaciju
+    // Express-ov Response objekat ima metodu redirect
     return res.redirect(frontendUrl);
   }
 }
