@@ -23,20 +23,24 @@ export class AuthController {
 
   @Get('google')
   @UseGuards(GoogleAuthGuard)
-  async googleAuth(@Req() req) {
-    // Guard automatically handles redirection to Google login page
-  }
+  async googleAuth(@Req() req) {}
 
   @Get('google/callback')
   @UseGuards(GoogleAuthGuard)
-  googleAuthRedirect(@Req() req) {
-    // Passport intercepts the code, extracts user details, and attaches it to the request
+  googleAuthRedirect(@Req() req, @Res() res: Response) {
+    // Ovde se nalaze podaci koje je Google vratio (ime, email, slika...)
     const user = req.user;
 
-    // In production, process user registration/login here and issue a JWT token
-    return {
-      message: 'User information retrieved successfully',
-      user,
-    };
+    // TODO: Ovde u produkciji praviš svoj JWT token na osnovu 'user' objekta
+    // Za sada šaljemo samo osnovne podatke ili privremeni string da testiramo React
+    const token = 'neki_tvoj_jwt_token_ili_id';
+
+    // Promeni ovo na URL tvoje React aplikacije u produkciji ili lokalno!
+    // Ako testiraš lokalno React, ovde stavi http://localhost:5173/oauth-success
+    // Ako ti je React na Vercelu/Netlify-u, stavi tu adresu.
+    const frontendUrl = `http://localhost:5173/oauth-success?token=${token}&email=${user.email}`;
+
+    // Ovo preusmerava brauzer sa bekenda direktno na frontend aplikaciju
+    return res.redirect(frontendUrl);
   }
 }
