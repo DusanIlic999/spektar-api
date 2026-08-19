@@ -1,6 +1,6 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { UsersService } from '../users/users.service';
+import { GoogleProfile, UsersService } from '../users/users.service';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -29,7 +29,32 @@ export class AuthService {
   async login(email: string, password: string) {
     const user = await this.validateUser(email, password);
 
-    const payload = { sub: user.id, email: user.email, username: user.username };
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      username: user.username,
+    };
+    const accessToken = this.jwtService.sign(payload);
+
+    return {
+      accessToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        displayName: user.displayName,
+      },
+    };
+  }
+
+  async loginWithGoogle(profile: GoogleProfile) {
+    const user = await this.usersService.findOrCreateGoogleUser(profile);
+
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      username: user.username,
+    };
     const accessToken = this.jwtService.sign(payload);
 
     return {

@@ -8,8 +8,25 @@ import { UserEntity } from './users.entity';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
+import { randomBytes } from 'crypto';
 import { ImageKitService } from 'src/imagekit/imagekit.service';
 import { EditUserDto } from './dto/edit-user.dto';
+
+export interface GoogleProfile {
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  picture?: string;
+}
+
+function isUniqueConstraintViolation(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code?: unknown }).code === '23505'
+  );
+}
 
 @Injectable()
 export class UsersService {
@@ -32,8 +49,8 @@ export class UsersService {
 
     try {
       return await this.usersRepository.save(newUser);
-    } catch (error: any) {
-      if (error.code === '23505') {
+    } catch (error) {
+      if (isUniqueConstraintViolation(error)) {
         throw new ConflictException('Email or username already exists');
       }
       throw error;
@@ -66,6 +83,68 @@ export class UsersService {
 
   async findByUsernameOrNull(username: string): Promise<UserEntity | null> {
     return await this.usersRepository.findOneBy({ username });
+  }
+
+  async findOrCreateGoogleUser(profile: GoogleProfile): Promise<UserEntity> {
+    const existing = await this.findByEmailOrNull(profile.email);
+    if (existing) {
+      return existing;
+    }
+
+    const username = await this.generateUniqueUsername(profile.email);
+    const displayName =
+      [profile.firstName, profile.lastName].filter(Boolean).join(' ') ||
+      username;
+
+    // Google-nalozi nemaju lozinku kod nas; generišemo nasumičnu koja se
+    // nikada ne otkriva korisniku (može kasnije da je postavi kroz edit profila)
+    const randomPassword = randomBytes(32).toString('hex');
+    const passwordHash = await bcrypt.hash(randomPassword, 10);
+
+    const newUser = this.usersRepository.create({
+      email: profile.email,
+      username,
+      displayName,
+      passwordHash,
+      avatarUrl: profile.picture,
+      isEmailVerified: true,
+    });
+
+    try {
+      return await this.usersRepository.save(newUser);
+    } catch (error) {
+      if (isUniqueConstraintViolation(error)) {
+        // Trka: neko drugi zahtev je u međuvremenu kreirao istog korisnika
+        const raceWinner = await this.findByEmailOrNull(profile.email);
+        if (raceWinner) {
+          return raceWinner;
+        }
+      }
+      throw error;
+    }
+  }
+
+  private async generateUniqueUsername(email: string): Promise<string> {
+    const base =
+      email
+        .split('@')[0]
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '')
+        .slice(0, 20) || 'user';
+    const padded = base.length >= 5 ? base : base.padEnd(5, '0');
+
+    let candidate = padded;
+    let attempt = 0;
+
+    while (await this.findByUsernameOrNull(candidate)) {
+      attempt += 1;
+      candidate =
+        attempt > 10
+          ? `${padded}${randomBytes(4).toString('hex')}`
+          : `${padded}${Math.floor(1000 + Math.random() * 9000)}`;
+    }
+
+    return candidate;
   }
 
   async findAllExcluding(excludedIds: string[]): Promise<UserEntity[]> {

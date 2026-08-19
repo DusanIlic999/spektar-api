@@ -9,17 +9,21 @@ import {
   Req,
   Res,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { GoogleAuthGuard } from './oauth.guard';
+import { GoogleProfile } from '../users/users.service';
 
-// 1. PROMENI OVU LINIJU: Uvezi express kao namespace
-import * as express from 'express'; 
+import * as express from 'express';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
-  
+  constructor(
+    private readonly authService: AuthService,
+    private readonly configService: ConfigService,
+  ) {}
+
   @Post('login')
   @HttpCode(HttpStatus.OK)
   login(@Body() loginDto: LoginDto) {
@@ -28,16 +32,22 @@ export class AuthController {
 
   @Get('google')
   @UseGuards(GoogleAuthGuard)
-  async googleAuth(@Req() req) {}
+  async googleAuth() {}
 
   @Get('google/callback')
   @UseGuards(GoogleAuthGuard)
-  // 2. PROMENI OVDE TIP: koristi express.Response umesto samo Response
-  googleAuthRedirect(@Req() req, @Res() res: express.Response) {
-    const user = req.user;
-    const token = 'neki_tvoj_jwt_token_ili_id';
-    const frontendUrl = `https://dusanprogram.eu/oauth-success?token=${token}&email=${user.email}`;
+  async googleAuthRedirect(
+    @Req() req: express.Request & { user: GoogleProfile },
+    @Res() res: express.Response,
+  ) {
+    const { accessToken } = await this.authService.loginWithGoogle(req.user);
 
-    return res.redirect(frontendUrl);
+    const frontendUrl =
+      this.configService.get<string>('FRONTEND_URL') ??
+      'https://dusanprogram.eu';
+
+    return res.redirect(
+      `${frontendUrl}/oauth-success?token=${encodeURIComponent(accessToken)}`,
+    );
   }
 }
